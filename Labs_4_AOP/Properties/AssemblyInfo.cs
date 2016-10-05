@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // Управление общими сведениями о сборке осуществляется с помощью 
 // набора атрибутов. Измените значения этих атрибутов, чтобы изменить сведения,
 // связанные со сборкой.
-[assembly: AssemblyTitle("Labs_4_AOP")]
+[assembly: AssemblyTitle("Labs_4_AOP1")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("Labs_4_AOP")]
+[assembly: AssemblyProduct("Labs_4_AOP1")]
 [assembly: AssemblyCopyright("Copyright ©  2016")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -20,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // Следующий GUID служит для идентификации библиотеки типов, если этот проект будет видимым для COM
-[assembly: Guid("c4ef8a34-f2af-49b7-8204-07a70bdf7782")]
+[assembly: Guid("fc2cc964-f433-4449-bb4a-4fb7139761fb")]
 
 // Сведения о версии сборки состоят из следующих четырех значений:
 //
