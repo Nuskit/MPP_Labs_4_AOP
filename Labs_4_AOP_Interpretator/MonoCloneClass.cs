@@ -16,40 +16,6 @@ namespace Labs_4_AOP_Interpretator
       this.assembly = treatedAssembly;
     }
 
-    //TODO: Clone interface
-    public void CloneClass(TypeDefinition treatedClass, TypeDefinition injectClass)
-    {
-      CloneAllFields(treatedClass, injectClass);
-      //CloneAllProperties(treatedClass, injectClass);
-      CloneAllMethods(treatedClass, injectClass);
-    }
-
-    //private void CloneAllProperties(TypeDefinition treatedClass, TypeDefinition injectClass)
-    //{
-    //  foreach (var property in injectClass.Properties)
-    //  {
-    //    assembly.MainModule.Import(property.g);
-    //    treatedClass.Fields.Add(property);
-    //  }
-    //}
-
-    private void CloneAllFields(TypeDefinition treatedClass, TypeDefinition injectClass)
-    {
-      foreach(var field in injectClass.Fields)
-      {
-        treatedClass.Fields.Add(new FieldDefinition(field.Name,field.Attributes,assembly.MainModule.Import(field.FieldType)));
-      }
-    }
-
-    private void CloneAllMethods(TypeDefinition treatedClass, TypeDefinition injectClassMethods)
-    {
-      foreach (var method in injectClassMethods.Methods)
-      {
-        var copyMethod = CloneMethod(method, treatedClass, method.Attributes);
-        treatedClass.Methods.Add(copyMethod);
-      }
-    }
-
     public MethodDefinition CloneMethod(MethodDefinition templateMethod, TypeDefinition typeDef, MethodAttributes methodAtributes, String format = "{0}")
     {
       var newMethod = new MethodDefinition(String.Format(format, templateMethod.Name), methodAtributes, assembly.MainModule.Import(templateMethod.ReturnType));
@@ -77,16 +43,15 @@ null);
           newInstruction.Operand = typeDef.Fields.First(x => x.Name == fieldDefinition.Name);
         }
 
+        //don't copy all Type
         if (newInstruction.Operand is MethodReference)
         {
-          //Try really hard to import type
-          var methodReference = (MethodReference)newInstruction.Operand;
-
-          var assemblyMethodReference=assembly.MainModule.Import(methodReference);
-          assembly.MainModule.Import(assemblyMethodReference.DeclaringType);
-          assembly.MainModule.Import(assemblyMethodReference.ReturnType);
-          assembly.MainModule.Import(assemblyMethodReference.MethodReturnType.ReturnType);
-
+          
+          var methodReference= (MethodReference)newInstruction.Operand;
+ 
+          assembly.MainModule.Import(methodReference.GetElementMethod());
+          assembly.MainModule.Import(methodReference.DeclaringType);
+          assembly.MainModule.Import(methodReference.ReturnType);
         }
         if (newInstruction.Operand is TypeReference)
         {
@@ -95,6 +60,7 @@ null);
         newMethod.Body.Instructions.Add(newInstruction);
       }
       newMethod.DeclaringType = typeDef;
+      assembly.MainModule.Import(newMethod);
       return newMethod;
     }
   }

@@ -9,6 +9,9 @@ namespace Labs_4_AOP
   [Log]
   public class Calculator
   {
+    public virtual void Empties()
+    {}
+
     public int Sum(int left, int right)
     {
       var a = SumRec(left, 1, right);
@@ -22,16 +25,34 @@ namespace Labs_4_AOP
 
     private int Privates(double koef)
     {
-      var a = new SomeNamespace.testing();
+      StringBuilder b = new StringBuilder(200);
       return 1;
     }
   }
-}
 
-namespace SomeNamespace
-{
-  public class testing
+
+
+  public class ChildCalculator :Calculator
   {
+    public ChildCalculator():this(7)
+    {
+      var k = 6;
+    }
+    public ChildCalculator(int s) :this(ref s,7)
+    {
 
+    }
+
+    public ChildCalculator(ref int s,int q):base()
+    {
+
+    }
+
+
+    public override void Empties()
+    {
+      var a = 5;
+      base.Empties();
+    }
   }
 }
