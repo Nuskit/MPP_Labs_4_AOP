@@ -11,29 +11,33 @@ namespace Labs_4_AOP
   {
     private StringBuilder logInformation = new StringBuilder(200);
 
-    private string GetParameterBlock(Dictionary<string, Tuple<int,object>> currentParameters)
+    private string GetParameterBlock(Dictionary<string, Tuple<int, object>> currentParameters)
     {
-      StringBuilder parameterInfo = new StringBuilder(100);
+      List<string> parameterInfo = new List<string>(currentParameters.Count);
       foreach (var parameterName in currentParameters.Keys)
       {
-        
-        parameterInfo.Append(String.Format("{0} = {1}", parameterName, currentParameters[parameterName].Item2.ToString()));
+        parameterInfo.Add(String.Format("{0} = {1}", WriteNullReference(parameterName), WriteNullReference(currentParameters[parameterName].Item2)));
       }
       //add comma split and reference watching
-      return parameterInfo.Length == 0 ? "none" : parameterInfo.ToString();
+      return parameterInfo.Count == 0 ? "none" : String.Join(" ,", parameterInfo);
     }
 
     public virtual void OnEnter(System.Reflection.MethodBase currentMethod,
       Dictionary<string, Tuple<int, object>> currentParameters)
     {
       logInformation.Clear();
-      logInformation.Append(String.Format("CLASS: {{{0}}}. METHOD: {{{1}}}. PARAMETERS: {{{2}}}",
-        currentMethod.DeclaringType.Name, currentMethod.Name, GetParameterBlock(currentParameters)));
+      logInformation.AppendFormat("CLASS: {{{0}}}. METHOD: {{{1}}}. PARAMETERS: {{{2}}}",
+        WriteNullReference(currentMethod.DeclaringType.Name), WriteNullReference(currentMethod.Name), GetParameterBlock(currentParameters));
+    }
+
+    private string WriteNullReference(object value)
+    {
+      return value == null ? "null" : value.ToString();
     }
 
     public virtual void OnExit(object returnValue)
     {
-      logInformation.Append(String.Format("RETURN: {{{0}}}", returnValue.ToString()));
+      logInformation.AppendFormat(" and RETURN: {{{0}}}", WriteNullReference(returnValue));
       OnExit();
     }
 

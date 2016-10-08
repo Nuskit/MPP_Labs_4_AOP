@@ -14,13 +14,18 @@ namespace Labs_4_AOP
 
     public int Sum(int left, int right)
     {
-      var a = SumRec(left, 1, right);
+      SumRec(left, "1s", right);
       return left + right;
     }
 
-    private int SumRec(int left, int right, int third)
+    public void SumRec(int left, string right, int third)
     {
-      return left + right + third;
+      Third(new int[] { left, 10, third }, "ks");
+    }
+
+    public string Third(int[] a,string ks)
+    {
+      return ks;
     }
 
     private int Privates(double koef)
@@ -28,8 +33,22 @@ namespace Labs_4_AOP
       StringBuilder b = new StringBuilder(200);
       return 1;
     }
-  }
 
+    public int PropertyValue
+    {
+      get;set;
+    }
+
+    public SomeClass clash()
+    {
+      return new SomeClass();
+    }
+
+    public object Clastering(params object[] affaid)
+    {
+      return new object[] { affaid };
+    }
+  }
 
 
   public class ChildCalculator :Calculator
@@ -52,7 +71,13 @@ namespace Labs_4_AOP
     public override void Empties()
     {
       var a = 5;
+      clash();
       base.Empties();
     }
+  }
+
+  public class SomeClass
+  {
+
   }
 }

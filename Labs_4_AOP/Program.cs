@@ -11,15 +11,20 @@ namespace Labs_4_AOP
   {
     static void Main(string[]args)
     {
-      Calculator a = new Calculator();
-      foreach (var member in a.GetType().GetMembers(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic))
-        Console.WriteLine(String.Format("{0}",member));
-      Console.WriteLine(String.Format("Cal value {0}", a.Sum(5, 6)));
+      Calculator a = new ChildCalculator();
+      foreach (var method in a.GetType().GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic))
+        Console.WriteLine(method);
+      Console.WriteLine("--------------------");
+      Console.WriteLine("Cal value {0}", a.Sum(5, 6));
 
-      foreach (var item in Assembly.GetExecutingAssembly().GetTypes())
-      {
-        Console.WriteLine(String.Format("Type {0}", item));
-      }
+      a.PropertyValue = 5;
+      Console.WriteLine("Prop value {0}", a.PropertyValue);
+
+      a.SumRec(0, null, 1);
+
+      a.Empties();
+      Console.WriteLine("--------------------");
+      a.Clastering(null);
       Console.ReadLine();
     }
   }

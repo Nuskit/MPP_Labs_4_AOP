@@ -125,9 +125,7 @@ namespace Labs_4_AOP_Interpretator
     private class Variable
     {
       public VariableDefinition attributeValue;
-      public VariableDefinition tupleValue;
       public VariableDefinition dictionaryValue;
-      public VariableDefinition currentMethodValue;
       public VariableDefinition returnValue;
     }
 
@@ -136,8 +134,6 @@ namespace Labs_4_AOP_Interpretator
       return new Variable()
       {
         attributeValue = new VariableDefinition(injectTypes.logAttributeRef),
-        tupleValue = new VariableDefinition(injectTypes.TupleTypeRef),
-        currentMethodValue = new VariableDefinition(injectTypes.methodBaseRef),
         dictionaryValue = new VariableDefinition(injectTypes.dictionaryTypeRef),
         returnValue = new VariableDefinition(returnType)
       };
@@ -145,8 +141,26 @@ namespace Labs_4_AOP_Interpretator
 
     private static void AddVariable(ILProcessor ilProc, Variable variable)
     {
-      foreach (var field in variable.GetType().GetFields())
-        ilProc.Body.Variables.Add((VariableDefinition)field.GetValue(variable));
+      var fields = variable.GetType().GetFields();
+      for (int i = fields.Length-2; i>=0 ; i--)
+        AddVariableValue(ilProc,variable,fields[i]);
+      AddVariableHaveValue(ilProc, variable, fields[fields.Length - 1]);
+    }
+
+    private static void AddVariableValue(ILProcessor ilProc, Variable variable, System.Reflection.FieldInfo fieldInfo)
+    {
+      ilProc.Body.Variables.Add(GetFieldFromVariable(variable, fieldInfo));
+    }
+
+    private static void AddVariableHaveValue(ILProcessor ilProc, Variable variable, System.Reflection.FieldInfo field)
+    {
+      if (IsValueType(GetFieldFromVariable(variable, field)))
+        AddVariableValue(ilProc, variable, field);
+    }
+
+    private static VariableDefinition GetFieldFromVariable(Variable variable, System.Reflection.FieldInfo field)
+    {
+      return (VariableDefinition)field.GetValue(variable);
     }
 
     private void InjectLogMethod(TypeDefinition typeDef, MethodDefinition injectMethod, MethodDefinition saveMethod)
@@ -160,6 +174,67 @@ namespace Labs_4_AOP_Interpretator
       var variable = InitializeVariable(injectMethod.ReturnType);
       AddVariable(ilProc, variable);
 
+      FoundAttributeLink(injectMethod, ilProc, variable.attributeValue);
+
+
+      //создаем новый Dictionary<stirng, object>
+      ilProc.Emit(OpCodes.Newobj, injectTypes.dictConstructorRef);
+      // помещаем в parametersVariable
+      ilProc.Emit(OpCodes.Stloc, variable.dictionaryValue);
+      foreach (var argument in injectMethod.Parameters)
+      {
+        ilProc.Emit(OpCodes.Ldloc, variable.dictionaryValue);
+        ilProc.Emit(OpCodes.Ldstr, argument.Name);
+
+        //загружаем тип параметра
+        ilProc.Emit(OpCodes.Ldc_I4, GetParameterType(argument));
+        //загружаем параметр
+        ilProc.Emit(OpCodes.Ldarg, argument);
+        BoxingPrimitiveType(argument, ilProc);
+        //создаем Tuple<int,object>
+        ilProc.Emit(OpCodes.Newobj, injectTypes.TupleConstructorRef);
+
+        // вызываем Dictionary.Add(string key, object value)
+        ilProc.Emit(OpCodes.Callvirt, injectTypes.dictMethodAddRef);
+      }
+      ilProc.Emit(OpCodes.Ldloc, variable.attributeValue);
+      ilProc.Emit(OpCodes.Call, injectTypes.getCurrentMethodRef);
+      ilProc.Emit(OpCodes.Ldloc, variable.dictionaryValue);
+      // вызываем OnEnter. На стеке должен быть объект, на котором вызывается OnEnter и параметры метода
+      ilProc.Emit(OpCodes.Callvirt, injectTypes.logAttributeOnEnterRef);
+
+
+      CallCopyMethod(injectMethod, saveMethod, ilProc);
+      WorkWithReturnValue(variable, ilProc);
+      ilProc.Emit(OpCodes.Ret);
+    }
+
+    private void WorkWithReturnValue(Variable variable, ILProcessor ilProc)
+    {
+      if (IsValueType(variable.returnValue))
+        AddReturnValueLog(variable, ilProc);
+      else
+        AddReturnLog(variable, ilProc);
+
+      CallExitLogValue(IsValueType(variable.returnValue), ilProc);
+      RepeatNotVoidReturnValue(ilProc, variable.returnValue);
+    }
+
+    private void AddReturnValueLog(Variable variable, ILProcessor ilProc)
+    {
+      ilProc.Emit(OpCodes.Stloc, variable.returnValue);
+      ilProc.Emit(OpCodes.Ldloc, variable.attributeValue);
+      ilProc.Emit(OpCodes.Ldloc, variable.returnValue);
+      BoxingPrimitiveType(variable.returnValue, ilProc);
+    }
+
+    private static void AddReturnLog(Variable variable, ILProcessor ilProc)
+    {
+      ilProc.Emit(OpCodes.Ldloc, variable.attributeValue);
+    }
+
+    private void FoundAttributeLink(MethodDefinition injectMethod, ILProcessor ilProc, VariableDefinition attributeValue)
+    {
       ilProc.Emit(OpCodes.Ldtoken, injectMethod.DeclaringType);
       ilProc.Emit(OpCodes.Call, injectTypes.getTypeFromHandleRef);
       // загружаем ссылку на тип LogAttribute
@@ -171,68 +246,16 @@ namespace Labs_4_AOP_Interpretator
       // приводим результат к типу LogAttribute
       ilProc.Emit(OpCodes.Castclass, injectTypes.logAttributeRef);
       // сохраняем в локальной переменной attributeValue
-      ilProc.Emit(OpCodes.Stloc, variable.attributeValue);
-
-
-
-      //// получаем текущий метод
-      //ilProc.Emit(OpCodes.Call, injectTypes.getCurrentMethodRef);
-      //// помещаем результат со стека в переменную currentMethodVar
-      //ilProc.Emit(OpCodes.Stloc, variable.currentMethodValue);
-      //// загружаем на стек ссылку на текущий метод
-      //ilProc.Emit(OpCodes.Ldloc, variable.currentMethodValue);
-
-      //создаем новый Dictionary<stirng, object>
-      ilProc.Emit(OpCodes.Newobj, injectTypes.dictConstructorRef);
-      // помещаем в parametersVariable
-      ilProc.Emit(OpCodes.Stloc, variable.dictionaryValue);
-      foreach (var argument in injectMethod.Parameters)
-      {
-        //загружаем тип параметра
-        ilProc.Emit(OpCodes.Ldloc, GetParameterType(argument));
-        //загружаем параметр
-        ilProc.Emit(OpCodes.Ldarg, argument);
-        BoxingPrimitiveType(argument, ilProc);
-        //создаем Tuple<int,object>
-        ilProc.Emit(OpCodes.Newobj, injectTypes.TupleConstructorRef);
-        //сохраняем в локальной переменной
-        ilProc.Emit(OpCodes.Stloc, variable.tupleValue);
-
-        ilProc.Emit(OpCodes.Ldloc, variable.dictionaryValue);
-        ilProc.Emit(OpCodes.Ldstr, argument.Name);
-        ilProc.Emit(OpCodes.Ldloc, variable.tupleValue);
-        // вызываем Dictionary.Add(string key, object value)
-        ilProc.Emit(OpCodes.Call, injectTypes.dictMethodAddRef);
-      }
-
-      // загружаем на стек сначала атрибут, потом параметры для вызова его метода OnEnter
-  //    ilProc.Emit(OpCodes.Stloc, variable.dictionaryValue);
-
-      ilProc.Emit(OpCodes.Ldloc, variable.attributeValue);
-      ilProc.Emit(OpCodes.Call, injectTypes.getCurrentMethodRef);
-      ilProc.Emit(OpCodes.Ldloc, variable.dictionaryValue);
-      // вызываем OnEnter. На стеке должен быть объект, на котором вызывается OnEnter и параметры метода
-      ilProc.Emit(OpCodes.Callvirt, injectTypes.logAttributeOnEnterRef);
-
-
-      CallCopyMethod(injectMethod, saveMethod, ilProc);
-      ilProc.Emit(OpCodes.Stloc, variable.returnValue);
-      ilProc.Emit(OpCodes.Ldloc, variable.attributeValue);
-      ilProc.Emit(OpCodes.Ldloc, variable.returnValue);
-
-      BoxingPrimitiveType(variable.returnValue, ilProc);
-      CallExitLogValue(IsValueType(variable.returnValue), ilProc);
-      RepeatPrimitiveReturnValue(ilProc, variable.returnValue);
-      ilProc.Emit(OpCodes.Ret);
+      ilProc.Emit(OpCodes.Stloc, attributeValue);
     }
 
-    private static void RepeatPrimitiveReturnValue(ILProcessor ilProc, VariableDefinition variable)
+    private static void RepeatNotVoidReturnValue(ILProcessor ilProc, VariableDefinition variable)
     {
-      if (variable.VariableType.IsPrimitive)
+      if (isNotVoidType(variable))
         ilProc.Emit(OpCodes.Ldloc, variable);
     }
 
-    private void CallExitLogValue(bool isValueType,ILProcessor ilProc)
+    private void CallExitLogValue(bool isValueType, ILProcessor ilProc)
     {
       if (isValueType)
         ilProc.Emit(OpCodes.Callvirt, injectTypes.logAttributeOnExitValueRef);
@@ -252,12 +275,21 @@ namespace Labs_4_AOP_Interpretator
         ilProc.Emit(OpCodes.Box, assembly.MainModule.Import(parameter.ParameterType));
     }
 
-    private bool IsValueType(VariableDefinition variable)
+    private static bool IsValueType(VariableDefinition variable)
     {
-      return variable.VariableType.IsValueType;
+      return isNotVoidType(variable)
+          || variable.VariableType.IsValueType
+          || variable.VariableType.IsGenericInstance
+          || variable.VariableType.IsDefinition
+          || variable.VariableType.IsPointer;
     }
 
-    private bool IsPrimitiveType(VariableDefinition variable)
+    private static bool isNotVoidType(VariableDefinition variable)
+    {
+      return !(variable.VariableType.Name == "Void");
+    }
+
+    private static bool IsPrimitiveType(VariableDefinition variable)
     {
       return variable.VariableType.IsPrimitive;
     }
