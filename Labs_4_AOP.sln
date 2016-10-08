@@ -6,6 +6,11 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Labs_4_AOP", "Labs_4_AOP\Labs_4_AOP.csproj", "{FC2CC964-F433-4449-BB4A-4FB7139761FB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Labs_4_AOP_Interpretator", "Labs_4_AOP_Interpretator\Labs_4_AOP_Interpretator.csproj", "{C4EF8A34-F2AF-49B7-8204-07A70BDF7782}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C4974A09-90DA-4C43-91D1-42CFDAFDF3B8} = {C4974A09-90DA-4C43-91D1-42CFDAFDF3B8}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Labs_4_AOP_ImplementsInformation", "Labs_4_AOP_ImplementsInformation\Labs_4_AOP_ImplementsInformation.csproj", "{C4974A09-90DA-4C43-91D1-42CFDAFDF3B8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +26,10 @@ Global
 		{C4EF8A34-F2AF-49B7-8204-07A70BDF7782}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C4EF8A34-F2AF-49B7-8204-07A70BDF7782}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C4EF8A34-F2AF-49B7-8204-07A70BDF7782}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C4974A09-90DA-4C43-91D1-42CFDAFDF3B8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C4974A09-90DA-4C43-91D1-42CFDAFDF3B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C4974A09-90DA-4C43-91D1-42CFDAFDF3B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C4974A09-90DA-4C43-91D1-42CFDAFDF3B8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
