@@ -424,7 +424,7 @@ namespace Labs_4_AOP_Interpretator
 
     private bool IsPrimitiveType(ParameterDefinition parameter)
     {
-      return parameter.ParameterType.GetElementType().IsPrimitive;
+      return (!parameter.ParameterType.IsArray) && parameter.ParameterType.GetElementType().IsPrimitive;
     }
 
     private static void CallCopyMethod(MethodDefinition injectMethod, MethodDefinition saveMethod, ILProcessor ilProc)
@@ -441,12 +441,12 @@ namespace Labs_4_AOP_Interpretator
     private static void LoadThisValue(ILProcessor ilProc, MethodDefinition saveMethod)
     {
       if (!saveMethod.IsStatic)
-        LoadArgumentOnStack(ilProc, 0, 0);
+        ilProc.Emit(OpCodes.Ldarg, 0);
     }
 
     private static void LoadArgumentOnStack(ILProcessor ilProc, int numberArgument, int argumentType)
     {
-      ilProc.Emit(IsDefaultArgument(argumentType) ? OpCodes.Ldarg : OpCodes.Ldarga, numberArgument);
+      ilProc.Emit(OpCodes.Ldarg,numberArgument);
     }
 
     private bool IsConstuctor(MethodDefinition injectMethod)

@@ -20,11 +20,13 @@ namespace Labs_4_AOP
 
     public void SumRec(int left, string right, int third)
     {
-      Third(new int[] { left, 10, third }, "ks");
+      Third(new int[] { left, 10, third }, "some string",right);
     }
 
-    public string Third(int[] a,string ks)
+    public string Third(int[] a,string ks,string lk)
     {
+      if (lk != "")
+        Third(a,ks,"");
       return ks;
     }
 
@@ -100,14 +102,21 @@ namespace Labs_4_AOP
 
     private void RefByDefault(int s)
     {
+      Console.WriteLine("Ref to default value ={0}", s);
       s++;
     }
 
     public ChildCalculatorTest(ref int s,int q)
     {
+      RefByRef(ref s);
       RefByDefault(s);
       RefByObject(s);
       s <<= 1;
+    }
+
+    private void RefByRef(ref int refer)
+    {
+      Console.WriteLine("Ref to ref value ={0}", refer);
     }
 
     private void RefByObject(object s)
