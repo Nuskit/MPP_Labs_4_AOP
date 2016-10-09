@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Labs_4_AOP
@@ -47,6 +47,24 @@ namespace Labs_4_AOP
     public object Clastering(params object[] affaid)
     {
       return new object[] { affaid };
+    }
+
+    public async Task<int> TaskTest()
+    {
+      return await Task.Run(() => { Thread.Sleep(300); return 5; });
+    }
+
+    public IEnumerable<int> GoYield(int start,int end)
+    {
+      {
+        for (int i = start; i <= end; i++)
+          yield return i;
+      }
+    }
+
+    ~Calculator()
+    {
+      Console.WriteLine("Finalize");
     }
   }
 

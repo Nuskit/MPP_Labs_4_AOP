@@ -1,10 +1,6 @@
 ﻿using Mono.Cecil;
 using Mono.Cecil.Cil;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Labs_4_AOP_Interpretator
 {
@@ -30,17 +26,22 @@ namespace Labs_4_AOP_Interpretator
         newMethod.Parameters.Add(new ParameterDefinition(assembly.MainModule.Import(parameterDefinition.ParameterType)));
       }
 
+      foreach(var exceptionDefinition in templateMethod.Body.ExceptionHandlers)
+      {
+        newMethod.Body.ExceptionHandlers.Add(exceptionDefinition);
+      }
+
+      var constructorInfo = typeof(Instruction).GetConstructor(
+        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new[] { typeof(OpCode), typeof(object) },null);
       foreach (var instruction in templateMethod.Body.Instructions)
       {
-        var constructorInfo = typeof(Instruction).GetConstructor(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance, null, new[] { typeof(OpCode), typeof(object) },
-null);
         var newInstruction = (Instruction)constructorInfo.Invoke(new[] { instruction.OpCode, instruction.Operand });
+        newInstruction.Offset = instruction.Offset;
 
         var fieldDefinition = newInstruction.Operand as FieldDefinition;
         if (fieldDefinition != null)
         {
           assembly.MainModule.Import(fieldDefinition.FieldType);
-          newInstruction.Operand = typeDef.Fields.First(x => x.Name == fieldDefinition.Name);
         }
 
         //don't copy all Type

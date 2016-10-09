@@ -1,13 +1,9 @@
-﻿using Labs_4_AOP;
-using Labs_4_AOP_Interpretator;
-using Mono.Cecil;
+﻿using Mono.Cecil;
 using Mono.Cecil.Cil;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Labs_4_AOP_Interpretator
 {
@@ -30,21 +26,41 @@ namespace Labs_4_AOP_Interpretator
     public void InjectLogger()
     {
       injectTypes = new MonoTypes(assembly);
-      foreach (var typeDef in assembly.MainModule.Types)
+      foreach (var currentType in assembly.MainModule.Types)
       {
-        if (typeDef.CustomAttributes.Where(attr => attr.AttributeType.Resolve().Name == "LogAttribute").FirstOrDefault() != null)
+        if (currentType.CustomAttributes.Where(attr => attr.AttributeType.Resolve().Name == "LogAttribute").FirstOrDefault() != null)
         {
-          for (int size = typeDef.Methods.Count - 1; size >= 0; size--)
-          {
-            if (!typeDef.Methods[size].IsConstructor)
-            {
-              var copyMethod = new MonoCloneClass(assembly).CloneMethod(typeDef.Methods[size], typeDef, MethodAttributes.Private | MethodAttributes.HideBySig, "{0}_MCopy");
-              typeDef.Methods.Add(copyMethod);
-              InjectLogMethod(typeDef, typeDef.Methods[size], copyMethod);
-            }
-          }
+          InjectAllClassMethods(currentType, currentType);
+          InjectAllNestedClasses(currentType);
         }
       }
+    }
+
+    private void InjectAllNestedClasses(TypeDefinition currentType)
+    {
+      foreach (var nestedClass in currentType.NestedTypes)
+      {
+        InjectAllClassMethods(nestedClass, currentType);
+        InjectAllNestedClasses(nestedClass);
+      }
+    }
+
+    private void InjectAllClassMethods(TypeDefinition currentClass, TypeDefinition parentClass)
+    {
+      for (int size = currentClass.Methods.Count - 1; size >= 0; size--)
+      {
+        if (currentClass.Methods[size].HasBody)
+        {
+          var copyMethod = new MonoCloneClass(assembly).CloneMethod(currentClass.Methods[size], currentClass, AttributesForCopyMethod(currentClass.Methods[size]), "{0}_MCopy");
+          currentClass.Methods.Add(copyMethod);
+          InjectLogMethod(currentClass, currentClass.Methods[size], copyMethod, parentClass);
+        }
+      }
+    }
+
+    private static MethodAttributes AttributesForCopyMethod(MethodDefinition method)
+    {
+      return MethodAttributes.Private | MethodAttributes.HideBySig | (method.Attributes & MethodAttributes.Static);
     }
 
     private class MonoTypes
@@ -142,8 +158,8 @@ namespace Labs_4_AOP_Interpretator
     private static void AddVariable(ILProcessor ilProc, Variable variable)
     {
       var fields = variable.GetType().GetFields();
-      for (int i = fields.Length-2; i>=0 ; i--)
-        AddVariableValue(ilProc,variable,fields[i]);
+      for (int i = fields.Length - 2; i >= 0; i--)
+        AddVariableValue(ilProc, variable, fields[i]);
       AddVariableHaveValue(ilProc, variable, fields[fields.Length - 1]);
     }
 
@@ -163,18 +179,19 @@ namespace Labs_4_AOP_Interpretator
       return (VariableDefinition)field.GetValue(variable);
     }
 
-    private void InjectLogMethod(TypeDefinition typeDef, MethodDefinition injectMethod, MethodDefinition saveMethod)
+    private void InjectLogMethod(TypeDefinition typeDef, MethodDefinition injectMethod, MethodDefinition saveMethod, TypeDefinition parentClass)
     {
       var ilProc = injectMethod.Body.GetILProcessor();
       // необходимо установить InitLocals в true, так как если он находился в false (в методе изначально не было локальных переменных)
       // а теперь локальные переменные появятся - верификатор IL кода выдаст ошибку.
       injectMethod.Body.Instructions.Clear();
+      injectMethod.Body.ExceptionHandlers.Clear();
       injectMethod.Body.InitLocals = true;
 
       var variable = InitializeVariable(injectMethod.ReturnType);
       AddVariable(ilProc, variable);
 
-      FoundAttributeLink(injectMethod, ilProc, variable.attributeValue);
+      FoundAttributeLink(injectMethod, ilProc, variable.attributeValue, parentClass);
 
 
       //создаем новый Dictionary<stirng, object>
@@ -233,9 +250,9 @@ namespace Labs_4_AOP_Interpretator
       ilProc.Emit(OpCodes.Ldloc, variable.attributeValue);
     }
 
-    private void FoundAttributeLink(MethodDefinition injectMethod, ILProcessor ilProc, VariableDefinition attributeValue)
+    private void FoundAttributeLink(MethodDefinition injectMethod, ILProcessor ilProc, VariableDefinition attributeValue, TypeDefinition parentClass)
     {
-      ilProc.Emit(OpCodes.Ldtoken, injectMethod.DeclaringType);
+      ilProc.Emit(OpCodes.Ldtoken, parentClass);
       ilProc.Emit(OpCodes.Call, injectTypes.getTypeFromHandleRef);
       // загружаем ссылку на тип LogAttribute
       ilProc.Emit(OpCodes.Ldtoken, injectTypes.logAttributeRef);
@@ -301,9 +318,23 @@ namespace Labs_4_AOP_Interpretator
 
     private static void CallCopyMethod(MethodDefinition injectMethod, MethodDefinition saveMethod, ILProcessor ilProc)
     {
-      for (int i = 0; i <= injectMethod.Parameters.Count; i++)
-        ilProc.Emit(OpCodes.Ldarg, i);
+      //load this
+      LoadThisValue(ilProc, saveMethod);
+      //load argument variable
+      for (int i = 0; i < injectMethod.Parameters.Count; i++)
+        LoadArgumentOnStack(ilProc, i + 1, GetParameterType(injectMethod.Parameters[i]));
       ilProc.Emit(OpCodes.Call, saveMethod);
+    }
+
+    private static void LoadThisValue(ILProcessor ilProc, MethodDefinition saveMethod)
+    {
+      if (!saveMethod.IsStatic)
+        LoadArgumentOnStack(ilProc, 0, 0);
+    }
+
+    private static void LoadArgumentOnStack(ILProcessor ilProc, int numberArgument, int argumentType)
+    {
+      ilProc.Emit(IsDefaultArgument(argumentType) ? OpCodes.Ldarg : OpCodes.Ldarga, numberArgument);
     }
 
     private bool IsConstuctor(MethodDefinition injectMethod)
@@ -311,7 +342,12 @@ namespace Labs_4_AOP_Interpretator
       return injectMethod.IsConstructor;
     }
 
-    private int GetParameterType(ParameterDefinition argument)
+    private static bool IsDefaultArgument(int value)
+    {
+      return value == 0;
+    }
+
+    private static int GetParameterType(ParameterDefinition argument)
     {
       return argument.IsOut ? 2 : argument.ParameterType.IsByReference ? 1 : 0;
     }

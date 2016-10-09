@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Labs_4_AOP
 {
@@ -25,6 +20,13 @@ namespace Labs_4_AOP
       a.Empties();
       Console.WriteLine("--------------------");
       a.Clastering(null);
+      a.TaskTest();
+      Console.WriteLine("--------------------");
+      foreach(int i in a.GoYield(0,5))
+        Console.WriteLine("Yield value {0}", i);
+      Console.WriteLine("--------------------");
+      new Calculator();
+      GC.Collect();
       Console.ReadLine();
     }
   }
