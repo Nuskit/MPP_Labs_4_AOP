@@ -3,7 +3,6 @@ using Mono.Cecil.Cil;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Labs_4_AOP_Interpretator
 {
@@ -19,22 +18,46 @@ namespace Labs_4_AOP_Interpretator
 
     public void EndChange(string file)
     {
-      assembly.MainModule.Import(typeof(StringBuilder).GetConstructor(new Type[] { typeof(int) }));
       assembly.Write(file);
     }
 
     public void InjectLogger(string advantageParam)
     {
-      injectTypes = new MonoTypes(assembly);
+      InitializeInjecting();
+      InsertLoggerInClasses(advantageParam);
+    }
+
+    private void InsertLoggerInClasses(string advantageParam)
+    {
       foreach (var currentType in assembly.MainModule.Types)
       {
-        if (currentType.CustomAttributes.Where(attr => attr.AttributeType.Resolve().Name == "LogAttribute").FirstOrDefault() != null)
-        {
-          InjectAllClassMethods(currentType, currentType);
-          if (advantageParam == "-r")
-            InjectAllNestedClasses(currentType);
-        }
+        TryInjectLogger(advantageParam, currentType);
       }
+    }
+
+    private void InitializeInjecting()
+    {
+      injectTypes = new MonoTypes(assembly);
+    }
+
+    private void TryInjectLogger(string advantageParam, TypeDefinition currentType)
+    {
+      if (IsTypeHaveLogAttribute(currentType))
+      {
+        InjectAllClassMethods(currentType, currentType);
+        InjectExtraAttribute(advantageParam, currentType);
+      }
+    }
+
+    private static bool IsTypeHaveLogAttribute(TypeDefinition currentType)
+    {
+      return currentType.CustomAttributes.Where(attr => attr.AttributeType.Resolve().Name == "LogAttribute").FirstOrDefault() != null;
+    }
+
+    private void InjectExtraAttribute(string advantageParam, TypeDefinition currentType)
+    {
+      if (advantageParam == "-r")
+        InjectAllNestedClasses(currentType);
     }
 
     private void InjectAllNestedClasses(TypeDefinition currentType)
@@ -50,13 +73,29 @@ namespace Labs_4_AOP_Interpretator
     {
       for (int size = currentClass.Methods.Count - 1; size >= 0; size--)
       {
-        if (currentClass.Methods[size].HasBody)
-        {
-          var copyMethod = new MonoCloneClass(assembly).CloneMethod(currentClass.Methods[size], currentClass, AttributesForCopyMethod(currentClass.Methods[size]), "{0}_MCopy");
-          currentClass.Methods.Add(copyMethod);
-          InjectLogMethod(currentClass, currentClass.Methods[size], copyMethod, parentClass);
-        }
+        TryCopyMethod(currentClass, parentClass, size);
       }
+    }
+
+    private void TryCopyMethod(TypeDefinition currentClass, TypeDefinition parentClass, int currentMethod)
+    {
+      if (IsCanCopyMethod(currentClass, currentMethod))
+      {
+        MethodDefinition copyMethod = CloneMethodAndInsertInClass(currentClass, currentMethod);
+        InjectLogMethod(currentClass, currentClass.Methods[currentMethod], copyMethod, parentClass);
+      }
+    }
+
+    private static bool IsCanCopyMethod(TypeDefinition currentClass, int size)
+    {
+      return currentClass.Methods[size].HasBody;
+    }
+
+    private MethodDefinition CloneMethodAndInsertInClass(TypeDefinition currentClass, int size)
+    {
+      var copyMethod = new MonoCloneClass(assembly).CloneMethod(currentClass.Methods[size], currentClass, AttributesForCopyMethod(currentClass.Methods[size]), "{0}_MCopy");
+      currentClass.Methods.Add(copyMethod);
+      return copyMethod;
     }
 
     private static MethodAttributes AttributesForCopyMethod(MethodDefinition method)
@@ -66,51 +105,49 @@ namespace Labs_4_AOP_Interpretator
 
     private class MonoTypes
     {
-      // ссылка на GetCurrentMethod()
+      // link for GetCurrentMethod()
       public MethodReference getCurrentMethodRef;
-      // ссылка на Attribute.GetCustomAttribute()
+      // link for Attribute.GetCustomAttribute()
       public MethodReference getCustomAttributeRef;
-      // ссылка на Type.GetTypeFromHandle() - аналог typeof()
+      // link Type.GetTypeFromHandle() - analog typeof()
       public MethodReference getTypeFromHandleRef;
-      // ссылка на тип MethodBase 
+      // link for Type of MethodBase 
       public TypeReference methodBaseRef;
-      // ссылка на тип logAttribute 
+      // link for Type of LogAttribute 
       public TypeDefinition logAttributeRef;
+      // link for LogAttribute.ctor()
       public MethodReference logAttributeConstructorRef;
-      // ссылка на logAttribute.OnEnter
+      // link for LogAttribute.OnEnter(some parameters)
       public MethodReference logAttributeOnEnterRef;
-      // ссылка на logAttribute.OnExit(object)
+      // link for LogAttribute.OnExit(object)
       public MethodReference logAttributeOnExitValueRef;
-      // ссылка на logAttribute.OnExit(void)
+      // link for LogAttribute.OnExit(void)
       public MethodReference logAttributeOnExitRef;
-      // ссылка на тип Dictionary<string, Tuple<int, object>>
+      // link for Type of Dictionary<string, Tuple<int, object>>
       public TypeReference dictionaryTypeRef;
-      //ссылка на конструктор
+      //link for Dictionary<string, Tuple<int, object>>.ctor()
       public MethodReference dictConstructorRef;
-      //ссылка на Dictionary.Add()
+      //link for Dictionary.Add()
       public MethodReference dictMethodAddRef;
-      //ссылка на GetValue
-      //ссылка на тип Tuple<int,object>
-      // ссылка на тип Dictionary<string, Tuple<int, object>>
+      //link for Type of Tuple<int, object>
       public TypeReference TupleTypeRef;
-      //ссылка на конструктор
+      //link for Tuple<int, object>.ctor(int, object)
       public MethodReference TupleConstructorRef;
 
       public MonoTypes(AssemblyDefinition assembly)
       {
-        // ссылка на GetCurrentMethod()
-        getCurrentMethodRef = assembly.MainModule.Import(typeof(System.Reflection.MethodBase).GetMethod("GetCurrentMethod"));
-        // ссылка на Attribute.GetCustomAttribute()
-        getCustomAttributeRef = assembly.MainModule.Import(typeof(Attribute).GetMethod("GetCustomAttribute", new Type[] { typeof(System.Reflection.MethodInfo), typeof(Type) }));
-        // ссылка на Type.GetTypeFromHandle() - аналог typeof()
-        getTypeFromHandleRef = assembly.MainModule.Import(typeof(Type).GetMethod("GetTypeFromHandle"));
-        // ссылка на тип MethodBase 
-        methodBaseRef = assembly.MainModule.Import(typeof(System.Reflection.MethodBase));
-        // ссылка на тип MethodInterceptionAttribute 
-
+        GetSystemTypeRef(assembly);
         GetLogAttibuteRef(assembly);
         GetDictionaryRef(assembly);
         GetTupleRef(assembly);
+      }
+
+      private void GetSystemTypeRef(AssemblyDefinition assembly)
+      {
+        getCurrentMethodRef = assembly.MainModule.Import(typeof(System.Reflection.MethodBase).GetMethod("GetCurrentMethod"));
+        getCustomAttributeRef = assembly.MainModule.Import(typeof(Attribute).GetMethod("GetCustomAttribute", new Type[] { typeof(System.Reflection.MethodInfo), typeof(Type) }));
+        getTypeFromHandleRef = assembly.MainModule.Import(typeof(Type).GetMethod("GetTypeFromHandle"));
+        methodBaseRef = assembly.MainModule.Import(typeof(System.Reflection.MethodBase));
       }
 
       private void GetTupleRef(AssemblyDefinition assembly)
@@ -129,12 +166,9 @@ namespace Labs_4_AOP_Interpretator
       private void GetLogAttibuteRef(AssemblyDefinition assembly)
       {
         logAttributeRef = assembly.MainModule.GetType("Labs_4_AOP.LogAttribute");
-        logAttributeConstructorRef = logAttributeRef.Methods.First(x => x.Name == ".ctor");//?
-        // ссылка на MethodInterceptionAttribute.OnEnter
+        logAttributeConstructorRef = logAttributeRef.Methods.First(x => x.Name == ".ctor");
         logAttributeOnEnterRef = logAttributeRef.Methods.FirstOrDefault(x => x.Name == "OnEnter");
-        // ссылка на MethodInterceptionAttribute.OnExit(object)
         logAttributeOnExitValueRef = logAttributeRef.Methods.FirstOrDefault(x => x.Name == "OnExit" && x.HasParameters);
-        // ссылка на MethodInterceptionAttribute.OnExit(void)
         logAttributeOnExitRef = logAttributeRef.Methods.FirstOrDefault(x => x.Name == "OnExit" && !x.HasParameters);
       }
     }
@@ -143,6 +177,7 @@ namespace Labs_4_AOP_Interpretator
     {
       public VariableDefinition attributeValue;
       public VariableDefinition dictionaryValue;
+      //must be last
       public VariableDefinition returnValue;
     }
 
@@ -161,7 +196,7 @@ namespace Labs_4_AOP_Interpretator
       var fields = variable.GetType().GetFields();
       for (int i = fields.Length - 2; i >= 0; i--)
         AddVariableValue(ilProc, variable, fields[i]);
-      AddVariableHaveValue(ilProc, variable, fields[fields.Length - 1]);
+      AddVariableHaveReturn(ilProc, variable, fields[fields.Length - 1]);
     }
 
     private static void AddVariableValue(ILProcessor ilProc, Variable variable, System.Reflection.FieldInfo fieldInfo)
@@ -169,7 +204,7 @@ namespace Labs_4_AOP_Interpretator
       ilProc.Body.Variables.Add(GetFieldFromVariable(variable, fieldInfo));
     }
 
-    private static void AddVariableHaveValue(ILProcessor ilProc, Variable variable, System.Reflection.FieldInfo field)
+    private static void AddVariableHaveReturn(ILProcessor ilProc, Variable variable, System.Reflection.FieldInfo field)
     {
       if (IsValueType(GetFieldFromVariable(variable, field)))
         AddVariableValue(ilProc, variable, field);
@@ -183,59 +218,119 @@ namespace Labs_4_AOP_Interpretator
     private void InjectLogMethod(TypeDefinition typeDef, MethodDefinition injectMethod, MethodDefinition saveMethod, TypeDefinition parentClass)
     {
       var ilProc = injectMethod.Body.GetILProcessor();
-      // необходимо установить InitLocals в true, так как если он находился в false (в методе изначально не было локальных переменных)
-      // а теперь локальные переменные появятся - верификатор IL кода выдаст ошибку.
-      injectMethod.Body.Instructions.Clear();
-      injectMethod.Body.ExceptionHandlers.Clear();
-      injectMethod.Body.InitLocals = true;
-
-      var variable = InitializeVariable(injectMethod.ReturnType);
-      AddVariable(ilProc, variable);
-
+      InitializeInjectLog(injectMethod);
+      //initialize local log variable in method
+      Variable variable = InitializeVariableForMethod(injectMethod, ilProc);
       FoundAttributeLink(injectMethod, ilProc, variable.attributeValue, parentClass);
-
-
-      //создаем новый Dictionary<stirng, object>
-      ilProc.Emit(OpCodes.Newobj, injectTypes.dictConstructorRef);
-      // помещаем в parametersVariable
-      ilProc.Emit(OpCodes.Stloc, variable.dictionaryValue);
-      foreach (var argument in injectMethod.Parameters)
-      {
-        ilProc.Emit(OpCodes.Ldloc, variable.dictionaryValue);
-        ilProc.Emit(OpCodes.Ldstr, argument.Name);
-
-        //загружаем тип параметра
-        ilProc.Emit(OpCodes.Ldc_I4, GetParameterType(argument));
-        //загружаем параметр
-        ilProc.Emit(OpCodes.Ldarg, argument);
-        BoxingPrimitiveType(argument, ilProc);
-        //создаем Tuple<int,object>
-        ilProc.Emit(OpCodes.Newobj, injectTypes.TupleConstructorRef);
-
-        // вызываем Dictionary.Add(string key, object value)
-        ilProc.Emit(OpCodes.Callvirt, injectTypes.dictMethodAddRef);
-      }
-      ilProc.Emit(OpCodes.Ldloc, variable.attributeValue);
-      ilProc.Emit(OpCodes.Call, injectTypes.getCurrentMethodRef);
-      ilProc.Emit(OpCodes.Ldloc, variable.dictionaryValue);
-      // вызываем OnEnter. На стеке должен быть объект, на котором вызывается OnEnter и параметры метода
-      ilProc.Emit(OpCodes.Callvirt, injectTypes.logAttributeOnEnterRef);
-
-
+      PrintEnterParametersInMethod(injectMethod, ilProc, variable);
       CallCopyMethod(injectMethod, saveMethod, ilProc);
       WorkWithReturnValue(variable, ilProc);
+      ExitFromTheMethod(ilProc);
+    }
+
+    private void PrintEnterParametersInMethod(MethodDefinition injectMethod, ILProcessor ilProc, Variable variable)
+    {
+      GenerateDictionaryVariable(injectMethod, ilProc, variable);
+      CallLogEnterMethod(ilProc, variable);
+    }
+
+    private static void ExitFromTheMethod(ILProcessor ilProc)
+    {
       ilProc.Emit(OpCodes.Ret);
     }
 
+    private void CallLogEnterMethod(ILProcessor ilProc, Variable variable)
+    {
+      //load on stack LogAttribute - this
+      ilProc.Emit(OpCodes.Ldloc, variable.attributeValue);
+      //call GetCurentMethod() and load on stack first parameters
+      ilProc.Emit(OpCodes.Call, injectTypes.getCurrentMethodRef);
+      //load on stack second parameters Dictionary
+      ilProc.Emit(OpCodes.Ldloc, variable.dictionaryValue);
+      // call LogAttribute.OnEnter(some parameters)
+      ilProc.Emit(OpCodes.Callvirt, injectTypes.logAttributeOnEnterRef);
+    }
+
+    private void GenerateDictionaryVariable(MethodDefinition injectMethod, ILProcessor ilProc, Variable variable)
+    {
+      CreateDictionaryVariable(ilProc, variable);
+      AddInDictionaryAllElements(injectMethod, ilProc, variable);
+    }
+
+    private void AddInDictionaryAllElements(MethodDefinition injectMethod, ILProcessor ilProc, Variable variable)
+    {
+      foreach (var argument in injectMethod.Parameters)
+      {
+        AddSimpleElementInDictionary(ilProc, variable, argument);
+      }
+    }
+
+    private void CreateDictionaryVariable(ILProcessor ilProc, Variable variable)
+    {
+      //create new Dictionary<string, Tuple<int, object>
+      ilProc.Emit(OpCodes.Newobj, injectTypes.dictConstructorRef);
+      // take off the stack into dictionaryVariable
+      ilProc.Emit(OpCodes.Stloc, variable.dictionaryValue);
+    }
+
+    private void AddSimpleElementInDictionary(ILProcessor ilProc, Variable variable, ParameterDefinition argument)
+    {
+      PartInitializeDictionaryElement(ilProc, variable, argument);
+      CreateTupleVariable(ilProc, argument);
+      AddElementInDictionary(ilProc);
+    }
+
+    private void AddElementInDictionary(ILProcessor ilProc)
+    {
+      // call Dictionary.Add(string key, object value)
+      ilProc.Emit(OpCodes.Callvirt, injectTypes.dictMethodAddRef);
+    }
+
+    private static void PartInitializeDictionaryElement(ILProcessor ilProc, Variable variable, ParameterDefinition argument)
+    {
+      ilProc.Emit(OpCodes.Ldloc, variable.dictionaryValue);
+      ilProc.Emit(OpCodes.Ldstr, argument.Name);
+    }
+
+    private void CreateTupleVariable(ILProcessor ilProc, ParameterDefinition argument)
+    {
+      //load parameter Type
+      ilProc.Emit(OpCodes.Ldc_I4, GetParameterType(argument));
+      //load value parameter
+      ilProc.Emit(OpCodes.Ldarg, argument);
+      BoxingPrimitiveType(argument, ilProc);
+      //create Tuple<int,object>
+      ilProc.Emit(OpCodes.Newobj, injectTypes.TupleConstructorRef);
+    }
+
+    private Variable InitializeVariableForMethod(MethodDefinition injectMethod, ILProcessor ilProc)
+    {
+      var variable = InitializeVariable(injectMethod.ReturnType);
+      AddVariable(ilProc, variable);
+      return variable;
+    }
+
+    private static void InitializeInjectLog(MethodDefinition injectMethod)
+    {
+      injectMethod.Body.Instructions.Clear();
+      injectMethod.Body.ExceptionHandlers.Clear();
+      //need to initialize the local variables
+      injectMethod.Body.InitLocals = true;
+    }
+
     private void WorkWithReturnValue(Variable variable, ILProcessor ilProc)
+    {
+      ChooseExitMethodDependingHaveReturnValue(variable, ilProc);
+      CallExitLogValue(IsValueType(variable.returnValue), ilProc);
+      RepeatNotVoidReturnValue(ilProc, variable.returnValue);
+    }
+
+    private void ChooseExitMethodDependingHaveReturnValue(Variable variable, ILProcessor ilProc)
     {
       if (IsValueType(variable.returnValue))
         AddReturnValueLog(variable, ilProc);
       else
         AddReturnLog(variable, ilProc);
-
-      CallExitLogValue(IsValueType(variable.returnValue), ilProc);
-      RepeatNotVoidReturnValue(ilProc, variable.returnValue);
     }
 
     private void AddReturnValueLog(Variable variable, ILProcessor ilProc)
@@ -253,23 +348,24 @@ namespace Labs_4_AOP_Interpretator
 
     private void FoundAttributeLink(MethodDefinition injectMethod, ILProcessor ilProc, VariableDefinition attributeValue, TypeDefinition parentClass)
     {
+      //load the link to type class having LogAttribute
       ilProc.Emit(OpCodes.Ldtoken, parentClass);
       ilProc.Emit(OpCodes.Call, injectTypes.getTypeFromHandleRef);
-      // загружаем ссылку на тип LogAttribute
+      //load the link to type LogAttribute
       ilProc.Emit(OpCodes.Ldtoken, injectTypes.logAttributeRef);
-      // Вызываем GetTypeFromHandle (в него транслируется typeof()) - эквививалент typeof(LogAttribute)
+      //call GetTypeFromHandle (it's tranclated typeof()) - analog typeof(LogAttribute)
       ilProc.Emit(OpCodes.Call, injectTypes.getTypeFromHandleRef);
-      // теперь у нас на стеке текущий метод и тип LogAttribute. Вызываем Attribute.GetCustomAttribute
+      //call Attribute.GetCustomAttribute
       ilProc.Emit(OpCodes.Call, injectTypes.getCustomAttributeRef);
-      // приводим результат к типу LogAttribute
+      // ive the result of the type LogAttribute
       ilProc.Emit(OpCodes.Castclass, injectTypes.logAttributeRef);
-      // сохраняем в локальной переменной attributeValue
+      //save in local variable attributeValue
       ilProc.Emit(OpCodes.Stloc, attributeValue);
     }
 
     private static void RepeatNotVoidReturnValue(ILProcessor ilProc, VariableDefinition variable)
     {
-      if (isNotVoidType(variable))
+      if (IsNotVoidType(variable))
         ilProc.Emit(OpCodes.Ldloc, variable);
     }
 
@@ -295,14 +391,14 @@ namespace Labs_4_AOP_Interpretator
 
     private static bool IsValueType(VariableDefinition variable)
     {
-      return isNotVoidType(variable)
+      return IsNotVoidType(variable)
           || variable.VariableType.IsValueType
           || variable.VariableType.IsGenericInstance
           || variable.VariableType.IsDefinition
           || variable.VariableType.IsPointer;
     }
 
-    private static bool isNotVoidType(VariableDefinition variable)
+    private static bool IsNotVoidType(VariableDefinition variable)
     {
       return !(variable.VariableType.Name == "Void");
     }
@@ -324,6 +420,7 @@ namespace Labs_4_AOP_Interpretator
       //load argument variable
       for (int i = 0; i < injectMethod.Parameters.Count; i++)
         LoadArgumentOnStack(ilProc, i + 1, GetParameterType(injectMethod.Parameters[i]));
+      //call old method
       ilProc.Emit(OpCodes.Call, saveMethod);
     }
 
@@ -343,15 +440,17 @@ namespace Labs_4_AOP_Interpretator
       return injectMethod.IsConstructor;
     }
 
-    private static bool IsDefaultArgument(int value)
-    {
-      return value == 0;
-    }
-
+    //default -0
+    //reference -1
+    //out -2
     private static int GetParameterType(ParameterDefinition argument)
     {
       return argument.IsOut ? 2 : argument.ParameterType.IsByReference ? 1 : 0;
     }
 
+    private static bool IsDefaultArgument(int value)
+    {
+      return value == 0;
+    }
   }
 }
