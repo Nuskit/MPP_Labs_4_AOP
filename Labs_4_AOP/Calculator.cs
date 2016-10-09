@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Labs_4_AOP
 {
-  [Log]
+  [Log(LogTargetType.Console)]
   public class Calculator
   {
     public virtual void Empties()
