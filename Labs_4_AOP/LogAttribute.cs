@@ -6,9 +6,10 @@ namespace Labs_4_AOP
   [AttributeUsage(AttributeTargets.Class)]
   public class LogAttribute : Attribute
   {
-    private static readonly Dictionary<LogTargetType, Lazy<ILogTarget>> targets = new Dictionary<LogTargetType, Lazy<ILogTarget>>()
+    private readonly Dictionary<LogTargetType, Lazy<ILogTarget>> targets = new Dictionary<LogTargetType, Lazy<ILogTarget>>()
     {
-      { LogTargetType.Console, new Lazy<ILogTarget>(()=>new LogTargetConsole()) }
+      { LogTargetType.Console, new Lazy<ILogTarget>(()=>new LogTargetConsole()) },
+      { LogTargetType.Memory, new Lazy<ILogTarget>(()=>new LogTargetTest())}
     };
 
     ILogTarget logTarget;

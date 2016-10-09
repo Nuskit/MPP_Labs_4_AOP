@@ -1,30 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Labs_4_AOP
 {
-  public class LogTargetConsole : ILogTarget
+  class LogTargetTest : ILogTarget
   {
-    private StringBuilder logInformation = new StringBuilder(200);
+    StringBuilder Buffer { get; set; }
+
+    public LogTargetTest()
+    {
+      Buffer = new StringBuilder(200);
+    }
 
     public void WriteEnterLog(MethodBase currentMethod, Dictionary<string, Tuple<int, object>> currentParameters)
     {
-      logInformation.Clear();
-      logInformation.AppendFormat("CLASS: {{{0}}}. METHOD: {{{1}}}. PARAMETERS: {{{2}}}",
-        WriteNullReference(currentMethod.DeclaringType.Name), WriteNullReference(currentMethod.Name), GetParameterBlock(currentParameters));
-    }
-
-    public void WriteExitLog()
-    {
-      Console.WriteLine(logInformation);
-    }
-
-    public void WriteExitLog(object returnValue)
-    {
-      logInformation.AppendFormat(" and RETURN: {{{0}}}", WriteNullReference(returnValue));
-      WriteExitLog();
+      Buffer.AppendFormat("c:{0}; m:{1}; p:{2}",
+        WriteNullReference(currentMethod.DeclaringType.Name), 
+        WriteNullReference(currentMethod.Name), 
+        GetParameterBlock(currentParameters));
     }
 
     private string WriteNullReference(object value)
@@ -40,6 +37,16 @@ namespace Labs_4_AOP
         parameterInfo.Add(String.Format("[{0}] {1} = {2}", (ParameterType)currentParameters[parameterName].Item1, WriteNullReference(parameterName), WriteNullReference(currentParameters[parameterName].Item2)));
       }
       return parameterInfo.Count == 0 ? "none" : String.Join(" ,", parameterInfo);
+    }
+
+    public void WriteExitLog()
+    {
+    }
+
+    public void WriteExitLog(object returnValue)
+    {
+      Buffer.AppendFormat("; r:{0}", WriteNullReference(returnValue));
+      WriteExitLog();
     }
   }
 }

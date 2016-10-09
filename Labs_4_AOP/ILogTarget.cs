@@ -10,4 +10,11 @@ namespace Labs_4_AOP
     void WriteExitLog(object returnValue);
     void WriteExitLog();
   }
+
+  public enum ParameterType
+  {
+    DEF = 0,
+    REF = 1,
+    OUT = 2
+  }
 }

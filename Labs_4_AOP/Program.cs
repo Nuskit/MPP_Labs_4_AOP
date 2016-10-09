@@ -6,7 +6,7 @@ namespace Labs_4_AOP
   {
     static void Main(string[]args)
     {
-      Calculator a = new ChildCalculator();
+      Calculator a = new ChildCalculatorTest();
       foreach (var method in a.GetType().GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic))
         Console.WriteLine(method);
       Console.WriteLine("--------------------");
@@ -25,7 +25,7 @@ namespace Labs_4_AOP
       foreach(int i in a.GoYield(0,5))
         Console.WriteLine("Yield value {0}", i);
       Console.WriteLine("--------------------");
-      new Calculator();
+      new ChildCalculatorTest();
       GC.Collect();
       Console.ReadLine();
     }

@@ -298,9 +298,22 @@ namespace Labs_4_AOP_Interpretator
       ilProc.Emit(OpCodes.Ldc_I4, GetParameterType(argument));
       //load value parameter
       ilProc.Emit(OpCodes.Ldarg, argument);
+      UnBoxReferenceType(ilProc, argument);
       BoxingPrimitiveType(argument, ilProc);
       //create Tuple<int,object>
       ilProc.Emit(OpCodes.Newobj, injectTypes.TupleConstructorRef);
+    }
+
+    private void UnBoxReferenceType(ILProcessor ilProc, ParameterDefinition argument)
+    {
+      if (!IsDefaultArgument(GetParameterType(argument)))
+        ilProc.Emit(OpCodes.Ldind_Ref);
+    }
+
+    private void UnBoxReferenceType(ILProcessor ilProc, VariableDefinition returnValue)
+    {
+      if (returnValue.VariableType.IsByReference)
+        ilProc.Emit(OpCodes.Ldind_Ref);
     }
 
     private Variable InitializeVariableForMethod(MethodDefinition injectMethod, ILProcessor ilProc)
@@ -338,6 +351,7 @@ namespace Labs_4_AOP_Interpretator
       ilProc.Emit(OpCodes.Stloc, variable.returnValue);
       ilProc.Emit(OpCodes.Ldloc, variable.attributeValue);
       ilProc.Emit(OpCodes.Ldloc, variable.returnValue);
+      UnBoxReferenceType(ilProc, variable.returnValue);
       BoxingPrimitiveType(variable.returnValue, ilProc);
     }
 
@@ -380,13 +394,13 @@ namespace Labs_4_AOP_Interpretator
     private void BoxingPrimitiveType(VariableDefinition variable, ILProcessor ilProc)
     {
       if (IsPrimitiveType(variable))
-        ilProc.Emit(OpCodes.Box, assembly.MainModule.Import(variable.VariableType));
+        ilProc.Emit(OpCodes.Box, assembly.MainModule.Import(variable.VariableType.GetElementType()));
     }
 
     private void BoxingPrimitiveType(ParameterDefinition parameter, ILProcessor ilProc)
     {
       if (IsPrimitiveType(parameter))
-        ilProc.Emit(OpCodes.Box, assembly.MainModule.Import(parameter.ParameterType));
+        ilProc.Emit(OpCodes.Box, assembly.MainModule.Import(parameter.ParameterType.GetElementType()));
     }
 
     private static bool IsValueType(VariableDefinition variable)
@@ -405,12 +419,12 @@ namespace Labs_4_AOP_Interpretator
 
     private static bool IsPrimitiveType(VariableDefinition variable)
     {
-      return variable.VariableType.IsPrimitive;
+      return variable.VariableType.GetElementType().IsPrimitive;
     }
 
     private bool IsPrimitiveType(ParameterDefinition parameter)
     {
-      return parameter.ParameterType.IsPrimitive;
+      return parameter.ParameterType.GetElementType().IsPrimitive;
     }
 
     private static void CallCopyMethod(MethodDefinition injectMethod, MethodDefinition saveMethod, ILProcessor ilProc)

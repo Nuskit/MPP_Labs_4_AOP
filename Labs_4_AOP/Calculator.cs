@@ -39,7 +39,7 @@ namespace Labs_4_AOP
       get;set;
     }
 
-    public SomeClass clash()
+    public SomeClass ReturnSomeClass()
     {
       return new SomeClass();
     }
@@ -51,7 +51,12 @@ namespace Labs_4_AOP
 
     public async Task<int> TaskTest()
     {
-      return await Task.Run(() => { Thread.Sleep(300); return 5; });
+      return await Task.Run(() => 
+      {
+        Thread.Sleep(250);
+        Console.WriteLine("End Sleeping");
+        return 5;
+      });
     }
 
     public IEnumerable<int> GoYield(int start,int end)
@@ -64,33 +69,55 @@ namespace Labs_4_AOP
 
     ~Calculator()
     {
-      Console.WriteLine("Finalize");
+      Console.WriteLine("Finalize work");
     }
   }
 
-
-  public class ChildCalculator :Calculator
+  [Log(LogTargetType.Console)]
+  public class ChildCalculatorTest :Calculator
   {
-    public ChildCalculator():this(7)
+    private int field;
+    private int Field
     {
-      var k = 6;
+      get
+      {
+        return field << 2;
+      }
+      set
+      {
+        field = value;
+      }
     }
-    public ChildCalculator(int s) :this(ref s,7)
+
+    public ChildCalculatorTest():this(7)
     {
-
+      Field = 7;
     }
-
-    public ChildCalculator(ref int s,int q):base()
+    public ChildCalculatorTest(int s) :this(ref s,7)
     {
-
+      s++;
     }
 
+    private void RefByDefault(int s)
+    {
+      s++;
+    }
+
+    public ChildCalculatorTest(ref int s,int q)
+    {
+      RefByDefault(s);
+      RefByObject(s);
+      s <<= 1;
+    }
+
+    private void RefByObject(object s)
+    {
+    }
 
     public override void Empties()
     {
       var a = 5;
-      clash();
-      base.Empties();
+      ReturnSomeClass();
     }
   }
 
