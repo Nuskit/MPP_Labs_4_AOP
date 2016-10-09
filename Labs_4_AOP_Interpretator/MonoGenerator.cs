@@ -23,7 +23,7 @@ namespace Labs_4_AOP_Interpretator
       assembly.Write(file);
     }
 
-    public void InjectLogger()
+    public void InjectLogger(string advantageParam)
     {
       injectTypes = new MonoTypes(assembly);
       foreach (var currentType in assembly.MainModule.Types)
@@ -31,7 +31,8 @@ namespace Labs_4_AOP_Interpretator
         if (currentType.CustomAttributes.Where(attr => attr.AttributeType.Resolve().Name == "LogAttribute").FirstOrDefault() != null)
         {
           InjectAllClassMethods(currentType, currentType);
-          InjectAllNestedClasses(currentType);
+          if (advantageParam == "-r")
+            InjectAllNestedClasses(currentType);
         }
       }
     }

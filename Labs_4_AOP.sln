@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Labs_4_AOP", "Labs_4_AOP\Labs_4_AOP.csproj", "{FC2CC964-F433-4449-BB4A-4FB7139761FB}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C4EF8A34-F2AF-49B7-8204-07A70BDF7782} = {C4EF8A34-F2AF-49B7-8204-07A70BDF7782}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Labs_4_AOP_Interpretator", "Labs_4_AOP_Interpretator\Labs_4_AOP_Interpretator.csproj", "{C4EF8A34-F2AF-49B7-8204-07A70BDF7782}"
 EndProject
